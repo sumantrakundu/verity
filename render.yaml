@@ -14,5 +14,5 @@ services:
       - key: OCR_ENGINE
         value: auto
       - key: CORS_ALLOW_ORIGINS
-        value: https://YOUR-SITE.netlify.app
+        value: https://doctrust26.netlify.app/
 
