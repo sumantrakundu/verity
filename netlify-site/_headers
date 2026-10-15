@@ -1,0 +1,8 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+
+/config.js
+  Cache-Control: no-store
+

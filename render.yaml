@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: verity-document-review-api
+    runtime: docker
+    dockerfilePath: ./python-backend/Dockerfile
+    dockerContext: ./python-backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: MAX_UPLOAD_MB
+        value: "15"
+      - key: RETENTION_HOURS
+        value: "24"
+      - key: OCR_ENGINE
+        value: auto
+      - key: CORS_ALLOW_ORIGINS
+        value: https://YOUR-SITE.netlify.app
