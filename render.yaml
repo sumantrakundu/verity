@@ -1,6 +1,7 @@
 services:
   - type: web
     name: verity-document-review-api
+    plan: free
     runtime: docker
     dockerfilePath: ./python-backend/Dockerfile
     dockerContext: ./python-backend
@@ -14,3 +15,4 @@ services:
         value: auto
       - key: CORS_ALLOW_ORIGINS
         value: https://YOUR-SITE.netlify.app
+
