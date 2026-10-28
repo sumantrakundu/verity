@@ -229,6 +229,29 @@ def _ocr_image_tesseract(image):
         return "", None, f"OCR could not complete ({type(exc).__name__}). Check the local OCR installation and image." 
 
 
+def _analysis_raster_bytes(data: bytes, extension: str) -> bytes:
+    """Create a bounded-size working raster while keeping metadata/hash on original bytes."""
+    from PIL import Image, ImageOps
+    source = Image.open(io.BytesIO(data))
+    width, height = source.size
+    pixel_count = width * height
+    max_pixels = 60_000_000 if extension in {".jpg", ".jpeg"} else 30_000_000
+    if pixel_count > max_pixels:
+        raise ValueError(f"Image resolution ({width}×{height}) is too large for this demo service. Resize it and try again.")
+    if extension in {".jpg", ".jpeg"}:
+        # JPEG decoders can downsample during decode, preventing large phone
+        # photos from expanding to hundreds of megabytes on a small free host.
+        source.draft("RGB", (2600, 2600))
+    source = ImageOps.exif_transpose(source).convert("RGB")
+    source.thumbnail((2600, 2600), Image.Resampling.LANCZOS)
+    output = io.BytesIO()
+    if extension == ".png":
+        source.save(output, format="PNG")
+    else:
+        source.save(output, format="JPEG", quality=90, optimize=True)
+    return output.getvalue()
+
+
 _PADDLE_ENGINE = None
 
 
@@ -407,7 +430,9 @@ def _jpeg_ela(data: bytes):
     """Basic error-level screening. ELA outliers are only leads for human review."""
     try:
         from PIL import Image, ImageChops, ImageStat
-        source = Image.open(io.BytesIO(data)).convert("RGB")
+        source = Image.open(io.BytesIO(data))
+        source.draft("RGB", (1800, 1800))
+        source = source.convert("RGB")
         source.thumbnail((1800, 1800), Image.Resampling.LANCZOS)
         encoded = io.BytesIO()
         source.save(encoded, format="JPEG", quality=90)
@@ -592,7 +617,8 @@ def analyze(filename: str, data: bytes):
             image = Image.open(io.BytesIO(data))
             image.verify()
             image = Image.open(io.BytesIO(data))
-            forensics_image_data = data
+            analysis_image_data = _analysis_raster_bytes(data, ext)
+            forensics_image_data = analysis_image_data
             metadata = {str(k): str(v)[:300] for k, v in image.info.items() if k not in {"icc_profile", "exif"}}
             try:
                 from PIL.ExifTags import TAGS
@@ -604,14 +630,14 @@ def analyze(filename: str, data: bytes):
                         metadata["EXIF GPS"] = "Location metadata present; values omitted from the report."
             except Exception:
                 pass
-            text, metrics, ocr_error = _ocr_image(data)
+            text, metrics, ocr_error = _ocr_image(analysis_image_data)
             if ocr_error: ocr_errors.append(ocr_error)
             if metrics: ocr_metrics.append(metrics)
             if metrics:
                 numeric_lines.extend(metrics.get("numeric_lines", []))
                 ocr_image_height = metrics.get("height")
-            image_layout = _rule_line_counts(data)
-            border_analysis = _border_geometry(data)
+            image_layout = _rule_line_counts(analysis_image_data)
+            border_analysis = _border_geometry(analysis_image_data)
             tamper_analysis = _jpeg_ela(data) if ext in {".jpg", ".jpeg"} else {"available": False, "regions": []}
             metadata_analysis = _image_metadata(data, image, ext)
             metadata = {"embedded_metadata_keys": ", ".join(metadata_analysis["metadata_keys"])} if metadata_analysis["metadata_present"] else {}
