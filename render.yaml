@@ -15,4 +15,3 @@ services:
         value: auto
       - key: CORS_ALLOW_ORIGINS
         value: https://doctrust26.netlify.app
-
