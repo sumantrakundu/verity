@@ -17,13 +17,6 @@ TEMP_ROOT.mkdir(parents=True, exist_ok=True)
 ALLOWED = {".pdf", ".png", ".jpg", ".jpeg", ".doc", ".docx"}
 app = FastAPI(title="Verity Document Review", version="0.1.0", docs_url="/api/docs")
 cors_origins = [origin.strip().rstrip("/") for origin in os.getenv("CORS_ALLOW_ORIGINS", "http://127.0.0.1:8080,http://localhost:8080").split(",") if origin.strip()]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type"],
-)
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 hits = {}
 
@@ -116,3 +109,14 @@ async def report(item_id: str):
         for s in lines: line(s)
         c.save(); return Response(out.getvalue(), media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=verity-report.pdf"})
     except ImportError: raise HTTPException(503, "PDF report support is unavailable. Install reportlab.")
+
+# Keep CORS outside FastAPI's error middleware so even unhandled 500 responses
+# include the allow-origin header. Without this, browsers mask server errors as
+# generic CORS/network failures, which makes upload failures hard to diagnose.
+app = CORSMiddleware(
+    app,
+    allow_origins=cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
